@@ -37,24 +37,42 @@ public class MainUI extends UI {
 	private TextField nameEditor = new TextField();
 	private Button saveButton = new Button("Save");
 	private Button showButton = new Button("Show");
+	private ShoppingCart shoppingCart = new ShoppingCart();
 
 	@Autowired
-	BeverageRepository repo;
+	private BeverageRepository repo;
 
 	@Override
 	protected void init(VaadinRequest request) {
-		// Inject styles in a not-so-neat way..
-		Page.getCurrent().getStyles().add(".tv { background-color: lightblue !important; }");
-		Page.getCurrent().getStyles().add(".game { background-color: lightgreen !important; }");
-		Page.getCurrent().getStyles().add(".film { background-color: yellow !important; }");
+		// Define callbacks for Spring Data
+		FetchCallback<Beverage, Object> fetchCallback = query -> repo.findAll(getSortingFromQuery(query)).stream()
+				.skip(query.getOffset()).limit(query.getLimit());
+		CountCallback<Beverage, Object> countCallback = query -> (int) repo.count();
+		ValueProvider<Beverage, Object> idProvider = Beverage::getId;
 
-		VerticalLayout content = new VerticalLayout();
-		setContent(content);
+		grid.setDataProvider(new CallbackDataProvider<>(fetchCallback, countCallback, idProvider));
 
-		content.addComponent(new Label("DevDay Grid Demo for Vaadin 8"));
+		// Save functionality and Binder features
+		saveButton.addClickListener(e -> {
+			if (binder.getBean() != null) {
+				save(binder.getBean());
+			}
+		});
+		binder.bind(nameEditor, Beverage::getName, Beverage::setName);
 
+		// Bind multi selection from Grid to the ShoppingCart
+		grid.setSelectionMode(SelectionMode.MULTI);
+		Binder<ShoppingCart> shoppingCartBinder = new Binder<>();
+		shoppingCartBinder.bind(grid.asMultiSelect(), ShoppingCart::getBeverages, ShoppingCart::setBeverages);
+		shoppingCartBinder.setBean(shoppingCart);
+
+		/* Specific part for Vaadin 8 */
+
+		// Stylename from the first column
 		grid.addColumn(Beverage::getName).setStyleGenerator(b -> b.getOrigin().name().toLowerCase())
 				.setSortProperty("name").setCaption("Name");
+
+		// Construct the action column using components
 		grid.addComponentColumn(beverage -> {
 			VerticalLayout layout = new VerticalLayout();
 
@@ -74,36 +92,21 @@ public class MainUI extends UI {
 		grid.setBodyRowHeight(100);
 		grid.setSizeFull();
 
-		// Define callbacks for Spring Data
-		FetchCallback<Beverage, Object> fetchCallback = query -> repo.findAll(getSortingFromQuery(query)).stream()
-				.skip(query.getOffset()).limit(query.getLimit());
-		CountCallback<Beverage, Object> countCallback = query -> (int) repo.count();
-		ValueProvider<Beverage, Object> idProvider = Beverage::getId;
-
-		grid.setDataProvider(new CallbackDataProvider<>(fetchCallback, countCallback, idProvider));
-
-		// Save functionality and Binder features
-		saveButton.addClickListener(e -> {
-			if (binder.getBean() != null) {
-				save(binder.getBean());
-			}
-		});
-		binder.bind(nameEditor, Beverage::getName, Beverage::setName);
-
-		// Create a shopping cart and ability to display its contents
-		ShoppingCart shoppingCart = new ShoppingCart();
 		showButton.addClickListener(e -> new ShoppingCartWindow(shoppingCart));
 
-		// Bind multi selection from Grid to the ShoppingCart
-		grid.setSelectionMode(SelectionMode.MULTI);
-		Binder<ShoppingCart> shoppingCartBinder = new Binder<>();
-		shoppingCartBinder.bind(grid.asMultiSelect(), ShoppingCart::getBeverages, ShoppingCart::setBeverages);
-		shoppingCartBinder.setBean(shoppingCart);
+		// Inject styles in a not-so-neat way..
+		Page.getCurrent().getStyles().add(".tv { background-color: lightblue !important; }");
+		Page.getCurrent().getStyles().add(".game { background-color: lightgreen !important; }");
+		Page.getCurrent().getStyles().add(".film { background-color: yellow !important; }");
 
-		content.addComponents(grid, new HorizontalLayout(nameEditor, saveButton), showButton);
+		VerticalLayout content = new VerticalLayout();
+		setContent(content);
+
+		content.addComponents(new Label("DevDay Grid Demo for Vaadin 8"), grid,
+				new HorizontalLayout(nameEditor, saveButton), showButton);
 	}
 
-	// Helpers methods for handling Spring Data
+	/* Common helper methods for handling Spring Data */
 	private void save(Beverage beverage) {
 		grid.getDataProvider().refreshItem(repo.save(beverage));
 	}
