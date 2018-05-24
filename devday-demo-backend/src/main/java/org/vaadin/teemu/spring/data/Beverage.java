@@ -23,7 +23,6 @@ public class Beverage {
 	public Beverage(String name, Origin origin) {
 		this.name = name;
 		this.origin = origin;
-
 	}
 
 	public String getName() {
